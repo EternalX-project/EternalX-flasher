@@ -23,7 +23,7 @@ ui_print() {
 
 # abort ["<text>" [...]]
 abort() {
-  ui_print " " "$@";
+  ui_print "$@";
   exit 1;
 }
 
@@ -68,7 +68,7 @@ split_boot() {
   local dumpfail;
 
   if [ ! -e "$(echo $block | cut -d\  -f1)" ]; then
-    abort "Invalid partition. Aborting...";
+    abort "! Invalid partition. Aborting...";
   fi;
   if [ "$(echo $block | grep ' ')" ]; then
     block=$(echo $block | cut -d\  -f1);
@@ -134,7 +134,7 @@ split_boot() {
   fi;
 
   if [ $? != 0 -o "$dumpfail" ]; then
-    abort "Dumping/splitting image failed. Aborting...";
+    abort "! Dumping/splitting image failed. Aborting...";
   fi;
   cd $home;
 }
@@ -155,7 +155,7 @@ unpack_ramdisk() {
   if [ -f ramdisk.cpio ]; then
     comp=$($bin/magiskboot decompress ramdisk.cpio 2>&1 | grep -v 'raw' | sed -n 's;.*\[\(.*\)\];\1;p');
   else
-    abort "No ramdisk found to unpack. Aborting...";
+    abort "! No ramdisk found to unpack. Aborting...";
   fi;
   if [ "$comp" ]; then
     mv -f ramdisk.cpio ramdisk.cpio.$comp;
@@ -173,7 +173,7 @@ unpack_ramdisk() {
   cd $ramdisk;
   EXTRACT_UNSAFE_SYMLINKS=1 cpio -d -F $split_img/ramdisk.cpio -i;
   if [ $? != 0 -o ! "$(ls)" ]; then
-    abort "Unpacking ramdisk failed. Aborting...";
+    abort "! Unpacking ramdisk failed. Aborting...";
   fi;
   if [ -d "$home/rdtmp" ]; then
     cp -af $home/rdtmp/* .;
@@ -189,6 +189,7 @@ dump_boot() {
 ### write_boot functions:
 # repack_ramdisk (repack ramdisk only)
 repack_ramdisk() {
+  ui_print "- Repacking ramdisk...";
   local comp packfail mtktype;
 
   cd $home;
@@ -224,7 +225,7 @@ repack_ramdisk() {
     fi;
   fi;
   if [ "$packfail" ]; then
-    abort "Repacking ramdisk failed. Aborting...";
+    abort "! Repacking ramdisk failed. Aborting...";
   fi;
 
   if [ -f "$bin/mkmtkhdr" -a -f "$split_img/boot.img-base" ]; then
@@ -237,6 +238,7 @@ repack_ramdisk() {
 
 # flash_boot (build, sign and write image only)
 flash_boot() {
+  ui_print "- Flashing kernel images";
   local varlist i kernel ramdisk fdt cmdline comp part0 part1 nocompflag signfail pk8 cert avbtype;
 
   cd $split_img;
@@ -319,7 +321,8 @@ flash_boot() {
           magisk_patched=$?;
         fi;
         if [ $((magisk_patched & 3)) -eq 1 ]; then
-          ui_print " " "Magisk detected! Patching kernel so reflashing Magisk is not necessary...";
+          ui_print "- Magisk detected!" 
+          ui_print "* so reflashing Magisk is not necessary.";
           comp=$($bin/magiskboot decompress kernel 2>&1 | grep -v 'raw' | sed -n 's;.*\[\(.*\)\];\1;p');
           ($bin/magiskboot split $kernel || $bin/magiskboot decompress $kernel kernel) 2>/dev/null;
           if [ $? != 0 -a "$comp" ]; then
@@ -358,7 +361,7 @@ flash_boot() {
     $bin/magiskboot repack $nocompflag $bootimg $home/boot-new.img;
   fi;
   if [ $? != 0 ]; then
-    abort "Repacking image failed. Aborting...";
+    abort "! Repacking image failed. Aborting...";
   fi;
 
   cd $home;
@@ -382,14 +385,14 @@ flash_boot() {
     fi;
   fi;
   if [ $? != 0 -o "$signfail" ]; then
-    abort "Signing image failed. Aborting...";
+    abort "! Signing image failed. Aborting...";
   fi;
   mv -f boot-new-signed.img boot-new.img 2>/dev/null;
 
   if [ ! -f boot-new.img ]; then
-    abort "No repacked image found to flash. Aborting...";
+    abort "! No repacked image found to flash. Aborting...";
   elif [ "$(wc -c < boot-new.img)" -gt "$(wc -c < boot.img)" ]; then
-    abort "New image larger than boot partition. Aborting...";
+    abort "! New image larger than boot partition. Aborting...";
   fi;
   if [ -f "$bin/flash_erase" -a -f "$bin/nandwrite" ]; then
     $bin/flash_erase $block 0 0;
@@ -401,12 +404,13 @@ flash_boot() {
     cat boot-new.img /dev/zero > $block 2>/dev/null || true;
   fi;
   if [ $? != 0 ]; then
-    abort "Flashing image failed. Aborting...";
+    abort "! Flashing image failed. Aborting...";
   fi;
 }
 
 # flash_dtbo (flash dtbo only)
 flash_dtbo() {
+  ui_print "- Flashing kernel dtbo";
   local i dtbo dtboblock;
 
   cd $home;
@@ -432,7 +436,7 @@ flash_dtbo() {
       cat $dtbo /dev/zero > $dtboblock 2>/dev/null || true;
     fi;
     if [ $? != 0 ]; then
-      abort "Flashing dtbo failed. Aborting...";
+      abort "! Flashing dtbo failed. Aborting...";
     fi;
   fi;
 }
@@ -676,6 +680,7 @@ setup_ak() {
   fi;
 
   # slot detection enabled by is_slot_device=1 or auto (from anykernel.sh)
+  ui_print "- Detecting boot slot...";
   case $is_slot_device in
     1|auto)
       slot=$(getprop ro.boot.slot_suffix 2>/dev/null);
@@ -699,12 +704,13 @@ setup_ak() {
         esac;
       fi;
       if [ ! "$slot" -a "$is_slot_device" == 1 ]; then
-        abort "Unable to determine active boot slot. Aborting...";
+        abort "! Unable to determine active boot slot. Aborting...";
       fi;
     ;;
   esac;
 
   # target block partition detection enabled by block=boot recovery or auto (from anykernel.sh)
+  ui_print "- Detecting block partition...";
   case $block in
      auto|"") block=boot;;
   esac;
@@ -722,7 +728,8 @@ setup_ak() {
             if [ "$mtdpart" == "$part" ]; then
               mtdname=$(echo $mtdmount | cut -d: -f1);
             else
-              abort "Unable to determine mtd $block partition. Aborting...";
+              ui_print "! block: $block";
+              abort "! Unable to determine mtd partition. Aborting...";
             fi;
             if [ -e /dev/mtd/$mtdname ]; then
               target=/dev/mtd/$mtdname;
@@ -744,7 +751,8 @@ setup_ak() {
       if [ "$target" ]; then
         block=$(ls $target 2>/dev/null);
       else
-        abort "Unable to determine $block partition. Aborting...";
+        ui_print "! block: $block";
+        abort "! Unable to determine boot partition. Aborting...";
       fi;
     ;;
     *)
@@ -754,7 +762,7 @@ setup_ak() {
     ;;
   esac;
   if [ ! "$no_block_display" ]; then
-    ui_print "$block";
+    ui_print "- Found boot: $block";
   fi;
 }
 ###
