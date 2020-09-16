@@ -150,6 +150,7 @@ setup_env() {
   ui_print "- Mounting /system, /vendor"
   umount_all;
   mount_all;
+  ui_print "- Setup environtment... "
   OLD_LD_PATH=$LD_LIBRARY_PATH;
   OLD_LD_PRE=$LD_PRELOAD;
   OLD_LD_CFG=$LD_CONFIG_FILE;
@@ -220,7 +221,7 @@ do_devicecheck() {
   for testname in $(file_getprop anykernel.sh 'device.name.*'); do
     for devicename in $device $product $vendordevice $vendorproduct; do
       if [ "$devicename" == "$testname" ]; then
-        ui_print "- Device name: $testname" " ";
+        ui_print "- Device name: $testname";
         match=1;
         break 2;
       fi;
@@ -284,7 +285,7 @@ do_levelcheck() {
     hi_lvl=9999-99;
   fi;
   if echo -e "$hi_lvl\n$lo_lvl\n$parsed_lvl" | $BB sort -g | $BB grep -n "$parsed_lvl" | $BB grep -q '^2:'; then
-    ui_print "$android_lvl" " ";
+    ui_print "- Android version: $android_lvl";
   else
     abort "! Unsupported security patch level. Aborting...";
   fi;
@@ -406,7 +407,6 @@ if [ -f banner ]; then
 fi;
 
 KERNEL_STRING="$(file_getprop anykernel.sh kernel.string)";
-ui_print "$KERNEL_STRING";
 if [ -f version ]; then
   ui_printfile version;
   ui_print " ";
@@ -424,10 +424,11 @@ ui_print "#   ##                 ####            #";
 ui_print "#  ##############     ####             #";
 ui_print "# ##############     ####              #";
 ui_print "#--------------------------------------#";
-ui_print "#    EternalX Kernel Redmi 5 (rosy)    #";
-ui_print "#             rev1.2 (beta)            #";
-ui_print "#         By xzen@zexceed12300         #";
+ui_print "$KERNEL_STRING";
+ui_print "#        By xzen@zexceed12300          #";
 ui_print "########################################";
+
+ui_print "+++ Beginning checking & setup +++"
 
 setup_env;
 
@@ -435,7 +436,7 @@ do_devicecheck;
 do_versioncheck;
 do_levelcheck;
 
-ui_print "- Installing kernel images...";
+ui_print " " "+++ Beginning patching boot image +++";
 CORE=$($BB grep -oE 'ak.*core.sh' anykernel.sh);
 test -f tools/$CORE || $BB ln -s $AKHOME/tools/ak*-core.sh $AKHOME/tools/$CORE;
 PATH="$AKHOME/bin:$PATH" home=$AKHOME $BB ash anykernel.sh $2;
