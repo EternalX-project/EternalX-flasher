@@ -23,7 +23,7 @@ ui_print() {
 
 # abort ["<text>" [...]]
 abort() {
-  ui_print "$@";
+  ui_print "! $@";
   exit 1;
 }
 
@@ -68,7 +68,7 @@ split_boot() {
   local dumpfail;
 
   if [ ! -e "$(echo $block | cut -d\  -f1)" ]; then
-    abort "! Invalid partition. Aborting...";
+    abort "Invalid partition. Aborting...";
   fi;
   if [ "$(echo $block | grep ' ')" ]; then
     block=$(echo $block | cut -d\  -f1);
@@ -134,7 +134,7 @@ split_boot() {
   fi;
 
   if [ $? != 0 -o "$dumpfail" ]; then
-    abort "! Dumping/splitting image failed. Aborting...";
+    abort "Dumping/splitting image failed. Aborting...";
   fi;
   cd $home;
 }
@@ -155,7 +155,7 @@ unpack_ramdisk() {
   if [ -f ramdisk.cpio ]; then
     comp=$($bin/magiskboot decompress ramdisk.cpio 2>&1 | grep -v 'raw' | sed -n 's;.*\[\(.*\)\];\1;p');
   else
-    abort "! No ramdisk found to unpack. Aborting...";
+    abort "No ramdisk found to unpack. Aborting...";
   fi;
   if [ "$comp" ]; then
     mv -f ramdisk.cpio ramdisk.cpio.$comp;
@@ -173,7 +173,7 @@ unpack_ramdisk() {
   cd $ramdisk;
   EXTRACT_UNSAFE_SYMLINKS=1 cpio -d -F $split_img/ramdisk.cpio -i;
   if [ $? != 0 -o ! "$(ls)" ]; then
-    abort "! Unpacking ramdisk failed. Aborting...";
+    abort "Unpacking ramdisk failed. Aborting...";
   fi;
   if [ -d "$home/rdtmp" ]; then
     cp -af $home/rdtmp/* .;
@@ -225,7 +225,7 @@ repack_ramdisk() {
     fi;
   fi;
   if [ "$packfail" ]; then
-    abort "! Repacking ramdisk failed. Aborting...";
+    abort "Repacking ramdisk failed. Aborting...";
   fi;
 
   if [ -f "$bin/mkmtkhdr" -a -f "$split_img/boot.img-base" ]; then
@@ -367,7 +367,7 @@ flash_boot() {
     unset PATCHVBMETAFLAG;
   fi;
   if [ $? != 0 ]; then
-    abort "! Repacking image failed. Aborting...";
+    abort "Repacking image failed. Aborting...";
   fi;
   [ -f .magisk ] && touch $home/magisk_patched;
 
@@ -392,14 +392,14 @@ flash_boot() {
     fi;
   fi;
   if [ $? != 0 -o "$signfail" ]; then
-    abort "! Signing image failed. Aborting...";
+    abort "Signing image failed. Aborting...";
   fi;
   mv -f boot-new-signed.img boot-new.img 2>/dev/null;
 
   if [ ! -f boot-new.img ]; then
-    abort "! No repacked image found to flash. Aborting...";
+    abort "No repacked image found to flash. Aborting...";
   elif [ "$(wc -c < boot-new.img)" -gt "$(wc -c < boot.img)" ]; then
-    abort "! New image larger than boot partition. Aborting...";
+    abort "New image larger than boot partition. Aborting...";
   fi;
   blockdev --setrw $block 2>/dev/null;
   if [ -f "$bin/flash_erase" -a -f "$bin/nandwrite" ]; then
@@ -412,7 +412,7 @@ flash_boot() {
     cat boot-new.img /dev/zero > $block 2>/dev/null || true;
   fi;
   if [ $? != 0 ]; then
-    abort "! Flashing image failed. Aborting...";
+    abort "Flashing image failed. Aborting...";
   fi;
 }
 
@@ -447,7 +447,7 @@ flash_generic() {
         flags=$($bin/httools_static disable-flags);
         [ $? == 0 ] || abort "Failed to parse top-level vbmeta. Aborting...";
         if [ "$flags" == "enabled" ]; then
-          ui_print " " "dm-verity detected! Patching $avb...";
+          ui_print "- dm-verity detected! Patching $avb...";
           for avbpath in /dev/block/bootdevice/by-name /dev/block/mapper; do
             for file in $avb $avb$slot; do
               if [ -e $avbpath/$file ]; then
@@ -468,7 +468,7 @@ flash_generic() {
         $bin/lptools_static replace $1_ak3 $1$slot || abort "Replacing $1$slot failed. Aborting...";
         imgblock=/dev/block/mapper/$1_ak3;
       else
-        ui_print "Creating $1_ak3 failed. Attempting to resize $1$slot...";
+        ui_print "* Creating $1_ak3 failed. Attempting to resize $1$slot...";
         $bin/httools_static umount $1 || abort "Unmounting $1 failed. Aborting...";
         if [ -e $path/$1-verity ]; then
           $bin/lptools_static unmap $1-verity || abort "Unmapping $1-verity failed. Aborting...";
@@ -496,7 +496,7 @@ flash_generic() {
       cat $img /dev/zero > $imgblock 2>/dev/null || true;
     fi;
     if [ $? != 0 ]; then
-      abort "! Flashing $1 failed. Aborting...";
+      abort "Flashing $1 failed. Aborting...";
     fi;
     if [ "$isro" != 0 ]; then
       blockdev --setro $imgblock 2>/dev/null;
@@ -779,7 +779,7 @@ setup_ak() {
         esac;
       fi;
       if [ ! "$slot" -a "$is_slot_device" == 1 ]; then
-        abort "! Unable to determine active slot. Aborting...";
+        abort "Unable to determine active slot. Aborting...";
       fi;
     ;;
   esac;
@@ -833,7 +833,7 @@ setup_ak() {
               mtdname=$(echo $mtdmount | cut -d: -f1);
             else
               ui_print "! block: $block";
-              abort "! Unable to determine mtd partition. Aborting...";
+              abort "Unable to determine mtd partition. Aborting...";
             fi;
             if [ -e /dev/mtd/$mtdname ]; then
               target=/dev/mtd/$mtdname;
@@ -856,7 +856,7 @@ setup_ak() {
         block=$(ls $target 2>/dev/null);
       else
         ui_print "! block: $block";
-        abort "! Unable to determine boot partition. Aborting...";
+        abort "Unable to determine boot partition. Aborting...";
       fi;
     ;;
     *)
